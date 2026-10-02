@@ -1,0 +1,31 @@
+groups:
+  - name: tp-api-golden-signals
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_requests_total[5m])), 1e-9) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Más del 5% de las respuestas de la API son 5xx"
+          description: "Tasa de 5xx = {{ $value | humanizePercentage }} en los últimos 5 minutos."
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{route!="/metrics"}[5m]))) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "La latencia p95 de la API supera 1 segundo"
+          description: "p95 = {{ $value | humanizeDuration }}."
+
+      - alert: ApiDown
+        expr: up{job="tp-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus no puede scrapear la API"
