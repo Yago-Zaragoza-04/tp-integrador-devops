@@ -1,0 +1,25 @@
+# Render Blueprint (infraestructura como código del hosting).
+# Render → New → Blueprint → seleccionar este repo. Después, reemplazar DOCKERHUB_USERNAME por el
+# usuario real de Docker Hub y copiar el Deploy Hook al secreto RENDER_DEPLOY_HOOK_URL de GitHub.
+# El pipeline despliega siempre una versión exacta pasando imgURL=<imagen:versión> al Deploy Hook.
+services:
+  - type: web
+    name: tp-integrador-devops
+    runtime: image
+    image:
+      url: docker.io/DOCKERHUB_USERNAME/tp-integrador-devops:1.0.0
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: LOG_LEVEL
+        value: info
+      - key: CHAOS_ENABLED
+        value: "false"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: RATE_LIMIT_MAX
+        value: "300"
+      - key: METRICS_TOKEN
+        sync: false # se carga a mano en Render; Grafana Cloud lo usa como Bearer para scrapear /metrics

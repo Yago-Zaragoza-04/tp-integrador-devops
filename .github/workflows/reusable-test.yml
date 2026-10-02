@@ -1,0 +1,54 @@
+name: Reusable · Tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit tests + cobertura
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # Misma versión de Node que el Dockerfile (.nvmrc): dev = CI = runtime.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Compilar (nest build)
+        run: npm run build
+
+      - name: Tests unitarios y e2e con umbral de cobertura (80% de líneas)
+        shell: bash
+        run: npm run test:cov 2>&1 | tee test-output.txt
+
+      - name: Resumen
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Resultado de los tests'
+            echo '```'
+            grep -E '^(Test Suites|Tests|Time):' test-output.txt || true
+            echo '```'
+            echo '### Cobertura'
+            echo '```'
+            grep -E '^-+\||^File |^All files|\.ts ' test-output.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage
+          path: |
+            test-output.txt
+            coverage/lcov.info
+          retention-days: 14

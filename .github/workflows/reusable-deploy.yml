@@ -1,0 +1,72 @@
+name: Reusable · Deploy en Render
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: Imagen exacta a desplegar (docker.io/<usuario>/tp-integrador-devops:<versión>)
+        type: string
+        required: true
+      version:
+        description: Versión SemVer que debe responder /version después del deploy
+        type: string
+        required: true
+    secrets:
+      RENDER_DEPLOY_HOOK_URL:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Hook + smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: ${{ vars.RENDER_SERVICE_URL }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Disparar el Deploy Hook con la imagen exacta
+        id: hook
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          IMAGE: ${{ inputs.image }}
+        shell: bash
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::warning title=Deploy omitido::Configurá el secreto RENDER_DEPLOY_HOOK_URL para desplegar en Render."
+            echo "triggered=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          encoded="$(jq -rn --arg v "$IMAGE" '$v|@uri')"
+          separator='?'
+          case "$HOOK" in *\?*) separator='&' ;; esac
+          # --silent --show-error: no se imprime nunca la URL del hook (es un secreto).
+          curl --fail --silent --show-error --output /dev/null -X POST "${HOOK}${separator}imgURL=${encoded}"
+          echo "Deploy solicitado para ${IMAGE}"
+          echo "triggered=true" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test post-deploy (Andon Cord en producción)
+        if: steps.hook.outputs.triggered == 'true' && vars.RENDER_SERVICE_URL != ''
+        env:
+          SERVICE_URL: ${{ vars.RENDER_SERVICE_URL }}
+          VERSION: ${{ inputs.version }}
+          SMOKE_TIMEOUT_S: '900'
+          SMOKE_POLL_MS: '15000'
+        run: node scripts/smoke-test.mjs "$SERVICE_URL" "$VERSION"
+
+      - name: Resumen
+        if: always()
+        env:
+          IMAGE: ${{ inputs.image }}
+          TRIGGERED: ${{ steps.hook.outputs.triggered }}
+        shell: bash
+        run: |
+          {
+            echo '### Deploy en Render'
+            echo "- Imagen: \`${IMAGE}\`"
+            echo "- Deploy Hook disparado: ${TRIGGERED:-false}"
+          } >> "$GITHUB_STEP_SUMMARY"
