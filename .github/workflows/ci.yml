@@ -1,0 +1,35 @@
+name: CI
+
+# Integración continua: corre en cada Pull Request hacia main. Todos los jobs son checks
+# requeridos por la protección de rama: si uno falla, el PR no se integra (Andon Cord).
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  commitlint:
+    uses: ./.github/workflows/reusable-commitlint.yml
+
+  lint:
+    uses: ./.github/workflows/reusable-lint.yml
+
+  test:
+    uses: ./.github/workflows/reusable-test.yml
+
+  security:
+    uses: ./.github/workflows/reusable-security.yml
+
+  docker:
+    needs: [lint, test, security]
+    uses: ./.github/workflows/reusable-docker.yml
+    with:
+      version: pr-${{ github.event.pull_request.number }}
+      push: false

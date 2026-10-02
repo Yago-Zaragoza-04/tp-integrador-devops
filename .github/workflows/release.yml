@@ -1,0 +1,99 @@
+name: Release
+
+# Entrega continua: cada merge a main vuelve a validar, calcula la versión SemVer a partir de
+# los Conventional Commits, publica la imagen en Docker Hub y la despliega en Render.
+# workflow_dispatch con rollback_version redeploya una versión ya publicada sin reconstruir nada.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      rollback_version:
+        description: Versión ya publicada a redeployar (rollback), por ejemplo 1.2.0. Vacío = release normal.
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    if: github.event_name == 'push' || inputs.rollback_version == ''
+    uses: ./.github/workflows/reusable-lint.yml
+
+  test:
+    if: github.event_name == 'push' || inputs.rollback_version == ''
+    uses: ./.github/workflows/reusable-test.yml
+
+  release:
+    name: Semantic release
+    needs: [lint, test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # crear el tag vX.Y.Z y el GitHub Release
+    outputs:
+      published: ${{ steps.semantic.outputs.new_release_published }}
+      version: ${{ steps.semantic.outputs.new_release_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Calcular versión, crear tag y release notes
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v6
+        with:
+          semantic_version: 25.0.9
+          extra_plugins: |
+            conventional-changelog-conventionalcommits@9.3.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resumen
+        env:
+          PUBLISHED: ${{ steps.semantic.outputs.new_release_published }}
+          VERSION: ${{ steps.semantic.outputs.new_release_version }}
+        run: |
+          if [ "$PUBLISHED" = "true" ]; then
+            echo "### Release v${VERSION} publicado" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Sin release: no hay commits feat/fix/perf desde el último tag" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  publish:
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    uses: ./.github/workflows/reusable-docker.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+      push: true
+    secrets:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  deploy:
+    needs: [release, publish]
+    if: needs.publish.outputs.published == 'true'
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      image: ${{ needs.publish.outputs.image }}
+      version: ${{ needs.release.outputs.version }}
+    secrets:
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+
+  rollback:
+    if: github.event_name == 'workflow_dispatch' && inputs.rollback_version != ''
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      image: docker.io/${{ vars.DOCKERHUB_USERNAME }}/tp-integrador-devops:${{ inputs.rollback_version }}
+      version: ${{ inputs.rollback_version }}
+    secrets:
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}

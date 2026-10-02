@@ -1,0 +1,153 @@
+name: Reusable · Imagen Docker
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Versión que se inyecta en la imagen (SemVer en release, pr-N en CI)
+        type: string
+        required: true
+      push:
+        description: Publicar en Docker Hub
+        type: boolean
+        default: false
+    secrets:
+      DOCKERHUB_TOKEN:
+        required: false
+    outputs:
+      image:
+        description: Referencia exacta publicada (docker.io/<usuario>/tp-integrador-devops:<versión>)
+        value: ${{ jobs.image.outputs.image }}
+      published:
+        description: "'true' si la imagen quedó publicada en Docker Hub"
+        value: ${{ jobs.image.outputs.published }}
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: tp-integrador-devops
+  LOCAL_TAG: tp-integrador-devops:ci
+
+jobs:
+  image:
+    name: Build, scan y smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      published: ${{ steps.push.outcome == 'success' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Calcular nombre y tags de la imagen
+        id: meta
+        env:
+          VERSION: ${{ inputs.version }}
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+        shell: bash
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          repo="docker.io/${DOCKERHUB_USERNAME:-local}/${IMAGE_NAME}"
+          # SemVer → X.Y.Z, X.Y y sha-<commit>. Nunca "latest".
+          if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            tags="${repo}:${VERSION},${repo}:${BASH_REMATCH[1]}.${BASH_REMATCH[2]},${repo}:sha-${short_sha}"
+          else
+            tags="${repo}:${VERSION}"
+          fi
+          {
+            echo "short_sha=${short_sha}"
+            echo "image=${repo}:${VERSION}"
+            echo "tags=${tags}"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build de la etapa runtime
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: runtime
+          load: true
+          tags: ${{ env.LOCAL_TAG }}
+          build-args: |
+            APP_VERSION=${{ inputs.version }}
+            GIT_SHA=${{ steps.meta.outputs.short_sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy — CVEs críticas con parche disponible cortan el pipeline
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.LOCAL_TAG }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+
+      - name: Verificar que el contenedor no corre como root
+        shell: bash
+        run: |
+          uid="$(docker run --rm --entrypoint id "$LOCAL_TAG" -u)"
+          echo "uid del proceso: $uid"
+          test "$uid" != "0"
+
+      - name: Smoke test del contenedor
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          docker run -d --name api -p 3000:3000 --read-only --cap-drop ALL "$LOCAL_TAG"
+          trap 'docker logs api; docker rm -f api >/dev/null' EXIT
+          SMOKE_TIMEOUT_S=60 node scripts/smoke-test.mjs http://localhost:3000 "$VERSION"
+
+      - name: Verificar credenciales de Docker Hub
+        id: creds
+        if: inputs.push
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        shell: bash
+        run: |
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning title=Publicación omitida::Configurá la variable DOCKERHUB_USERNAME y el secreto DOCKERHUB_TOKEN para publicar en Docker Hub."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/login-action@v4
+        if: inputs.push && steps.creds.outputs.ok == 'true'
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publicar en Docker Hub
+        id: push
+        if: inputs.push && steps.creds.outputs.ok == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: runtime
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            APP_VERSION=${{ inputs.version }}
+            GIT_SHA=${{ steps.meta.outputs.short_sha }}
+          cache-from: type=gha
+          # Supply chain (OWASP A03/A08): SBOM y attestation de procedencia junto a la imagen.
+          sbom: true
+          provenance: mode=max
+
+      - name: Resumen
+        if: always()
+        shell: bash
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          PUSHED: ${{ steps.push.outcome }}
+        run: |
+          {
+            echo '### Imagen Docker'
+            echo "- Tags: \`${TAGS//,/\`, \`}\`"
+            echo "- Publicada en Docker Hub: ${PUSHED:-no}"
+          } >> "$GITHUB_STEP_SUMMARY"
