@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # Imagen base fijada a versión exacta (nunca "latest"). Debe coincidir con .nvmrc:
 # desarrollo, CI y runtime usan el mismo Node.
-ARG NODE_IMAGE=node:22.23.3-alpine3.24
+ARG NODE_IMAGE=node:22.20.0-alpine3.22
 
 #
 # 🧱 Base: configuración común a todas las etapas
