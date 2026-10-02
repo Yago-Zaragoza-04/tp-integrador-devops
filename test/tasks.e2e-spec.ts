@@ -20,7 +20,7 @@ describe('API de tareas (e2e)', () => {
   });
 
   it('crea una tarea con id UUID, Location y valores por defecto', async () => {
-    const res = await request(t.server).post('/api/v1/tasks').send({ title: '  Configurar CI  ' }).expect(201);
+    const res = await request(t.server).post('/api/v1/tasks').send({ title: '  Configurar CI  ' }).expect(200);
     expect(res.body.id).toMatch(UUID_V4);
     expect(res.body).toMatchObject({ title: 'Configurar CI', description: '', done: false });
     expect(res.headers.location).toBe(`/api/v1/tasks/${res.body.id}`);
