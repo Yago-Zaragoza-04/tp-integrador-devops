@@ -262,7 +262,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\", status_code=~\"5..\"}[$__rate_interval])) / clamp_min(sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\"}[$__rate_interval])), 1e-9)",
+          "expr": "(sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\", status_code=~\"5..\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "",
           "refId": "A",
           "range": true,
@@ -694,7 +694,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\", status_code=~\"4..\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\", status_code=~\"4..\"}[$__rate_interval])) or vector(0)",
           "legendFormat": "4xx (cliente)",
           "refId": "A",
           "range": true,
@@ -705,7 +705,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\", status_code=~\"5..\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\", status_code=~\"5..\"}[$__rate_interval])) or vector(0)",
           "legendFormat": "5xx (servidor)",
           "refId": "B",
           "range": true,
@@ -800,7 +800,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\", status_code=~\"4..\"}[$__rate_interval])) / clamp_min(sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\"}[$__rate_interval])), 1e-9)",
+          "expr": "(sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\", status_code=~\"4..\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "4xx",
           "refId": "A",
           "range": true,
@@ -811,7 +811,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\", status_code=~\"5..\"}[$__rate_interval])) / clamp_min(sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\"}[$__rate_interval])), 1e-9)",
+          "expr": "(sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\", status_code=~\"5..\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(http_requests_total{service=\"tp-integrador-devops\", route!=\"/metrics\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "5xx",
           "refId": "B",
           "range": true,
