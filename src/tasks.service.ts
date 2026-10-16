@@ -11,8 +11,9 @@ import { CreateTaskDto, ReplaceTaskDto, TaskDto } from './task.dto';
 export class TasksService {
   private readonly tasks = new Map<string, TaskDto>();
 
-  list(): TaskDto[] {
-    return [...this.tasks.values()];
+  list(filter: { done?: boolean } = {}): TaskDto[] {
+    const all = [...this.tasks.values()];
+    return filter.done === undefined ? all : all.filter((task) => task.done === filter.done);
   }
 
   get(id: string): TaskDto | undefined {

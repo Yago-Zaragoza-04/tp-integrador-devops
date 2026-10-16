@@ -45,4 +45,12 @@ describe('TasksService', () => {
     expect(service.remove(task.id)).toBe(true);
     expect(service.list()).toHaveLength(0);
   });
+
+  it('filtra por estado; sin filtro devuelve todas', () => {
+    service.create({ title: 'pendiente' });
+    service.create({ title: 'hecha', done: true });
+    expect(service.list({ done: true }).map((t) => t.title)).toEqual(['hecha']);
+    expect(service.list({ done: false }).map((t) => t.title)).toEqual(['pendiente']);
+    expect(service.list()).toHaveLength(2);
+  });
 });

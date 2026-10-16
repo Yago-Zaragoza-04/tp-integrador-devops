@@ -19,7 +19,15 @@ describe('TasksController', () => {
   it('lista las tareas con su total', () => {
     controller.create({ title: 'a' }, res);
     controller.create({ title: 'b' }, res);
-    expect(controller.list().total).toBe(2);
+    expect(controller.list({}).total).toBe(2);
+  });
+
+  it('filtra por estado y el total refleja el filtro', () => {
+    controller.create({ title: 'pendiente' }, res);
+    controller.create({ title: 'hecha', done: true }, res);
+    const done = controller.list({ done: true });
+    expect(done.total).toBe(1);
+    expect(done.items[0].title).toBe('hecha');
   });
 
   it('al crear informa la ubicación del recurso', () => {

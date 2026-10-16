@@ -45,7 +45,7 @@ export function configureApp(app: NestExpressApplication, { config, logger }: { 
       exceptionFactory: (errors) =>
         new BadRequestException({
           error: 'validation_error',
-          message: 'El cuerpo de la petición no es válido.',
+          message: 'La petición no es válida.',
           details: flatten(errors),
         }),
     }),

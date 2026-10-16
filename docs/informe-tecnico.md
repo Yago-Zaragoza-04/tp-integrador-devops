@@ -15,7 +15,7 @@ Una API REST de tareas en **NestJS + TypeScript** atraviesa un ciclo de vida com
 
 | Fase de la consigna | Qué se implementó |
 |---|---|
-| 1. Desarrollo y documentación | NestJS 11, CRUD `/api/v1/tasks`, 46 tests con Jest (unitarios + e2e, 98,3% de cobertura de líneas), **Swagger UI en `/docs`** y OpenAPI en `/openapi.json` |
+| 1. Desarrollo y documentación | NestJS 11, CRUD `/api/v1/tasks`, 51 tests con Jest (unitarios + e2e, 98,4% de cobertura de líneas), **Swagger UI en `/docs`** y OpenAPI en `/openapi.json` |
 | 2. Gestión de cambios | GitHub Flow, `main` protegida, PRs con evidencia, Conventional Commits validados por commitlint, **SemVer automático con semantic-release** |
 | 3. Docker | Dockerfile multi-stage (`base → deps → build → test → runtime`), `node:22.23.3-alpine3.24`, usuario `node`, caché de capas, `docker compose up` levanta API + Prometheus + Grafana |
 | 4. CI/CD | 8 workflows de GitHub Actions (6 reutilizables), Trivy, smoke tests, publicación en Docker Hub con tag SemVer, deploy a Render por Deploy Hook con la imagen exacta |
@@ -236,7 +236,7 @@ siempre como secretos (nunca en `docker-compose.yml` ni como build args de la im
 
 | Endpoint | Uso |
 |---|---|
-| `GET/POST /api/v1/tasks`, `GET/PUT/DELETE /api/v1/tasks/{id}` | CRUD de tareas (repositorio en memoria, ids UUID) |
+| `GET/POST /api/v1/tasks`, `GET/PUT/DELETE /api/v1/tasks/{id}` | CRUD de tareas (repositorio en memoria, ids UUID); el listado acepta `?done=true\|false` |
 | `GET /docs`, `GET /openapi.json` | Documentación interactiva (requisito excluyente) |
 | `GET /health`, `GET /ready` | Liveness y readiness (`/ready` da 503 durante el apagado) |
 | `GET /version` | Versión y commit desplegados (los valida el smoke test post-deploy) |
