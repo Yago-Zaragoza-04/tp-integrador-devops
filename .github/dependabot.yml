@@ -14,6 +14,11 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    # NestJS se mantiene en la línea 11: un salto mayor (12) rompe los peers (@nestjs/testing 12
+    # exige @nestjs/common 12) y es una migración, no un parche. Se siguen recibiendo minor y patch.
+    ignore:
+      - dependency-name: "@nestjs/*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
