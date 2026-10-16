@@ -37,7 +37,7 @@ jobs:
     permissions:
       contents: write # crear el tag vX.Y.Z y el GitHub Release
     outputs:
-      published: ${{ steps.semantic.outputs.new_release_published }}
+      published: ${{ steps.tag.outputs.published }}
       version: ${{ steps.semantic.outputs.new_release_version }}
     steps:
       - uses: actions/checkout@v7
@@ -48,26 +48,37 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Calcular versión, crear tag y release notes
+      # semantic-release calcula la versión y las release notes a partir de los Conventional
+      # Commits (dry run: no escribe nada). El tag y el Release se crean después por la API de
+      # GitHub: el push de refs/notes que hace semantic-release desde Actions falla en este repo
+      # con un error de almacenamiento del lado de GitHub ("unable to write file ... pack").
+      - name: Calcular versión y release notes
         id: semantic
         uses: cycjimmy/semantic-release-action@v6
         with:
           semantic_version: 25.0.9
+          dry_run: true
           extra_plugins: |
             conventional-changelog-conventionalcommits@9.3.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resumen
+      - name: Crear tag y GitHub Release
+        id: tag
         env:
-          PUBLISHED: ${{ steps.semantic.outputs.new_release_published }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.semantic.outputs.new_release_version }}
+          NOTES: ${{ steps.semantic.outputs.new_release_notes }}
         run: |
-          if [ "$PUBLISHED" = "true" ]; then
-            echo "### Release v${VERSION} publicado" >> "$GITHUB_STEP_SUMMARY"
-          else
+          if [ -z "$VERSION" ]; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
             echo "### Sin release: no hay commits feat/fix/perf desde el último tag" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
+          printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
+          gh release create "v${VERSION}" --target "$GITHUB_SHA" --title "v${VERSION}" --notes-file "$RUNNER_TEMP/notes.md"
+          echo "published=true" >> "$GITHUB_OUTPUT"
+          echo "### Release v${VERSION} publicado" >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     needs: release
