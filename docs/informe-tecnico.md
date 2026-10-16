@@ -179,8 +179,9 @@ remote: - 8 of 8 required status checks are expected.
 | `feat(...)!` o footer `BREAKING CHANGE:` | MAJOR (`1.1.1 → 2.0.0`) |
 | `docs`, `ci`, `build`, `test`, `refactor`, `chore` | sin release |
 
-semantic-release crea el tag `vX.Y.Z` y el GitHub Release con las notas agrupadas en español; **no
-commitea en `main`** (no hace falta saltear la protección). La imagen se publica como `X.Y.Z`,
+semantic-release calcula la versión y arma las notas agrupadas en español; el job de release crea
+el tag `vX.Y.Z` y el GitHub Release con esas notas. **Nada se commitea en `main`** (no hace falta
+saltear la protección). La imagen se publica como `X.Y.Z`,
 `X.Y` y `sha-<commit>`; Render recibe la referencia `X.Y.Z` exacta. Se descartaron los otros dos
 esquemas de la consigna como principal porque SemVer comunica compatibilidad, pero el tag
 `sha-<commit>` se publica igual para trazabilidad inmutable imagen ↔ commit.
@@ -189,6 +190,17 @@ La historia de `main` muestra el efecto de la convención: el PR #1 (`feat(api):
 PR #2 (`build(docker): …`) y el PR #3 (`ci: …`) no generan versión por sí mismos, y al mergear el PR #3
 —cuando el workflow de release ya existe— semantic-release analiza los commits desde el inicio y
 calcula **v1.0.0** a partir del `feat`. Los PR de documentación (`docs: …`) no cambian la versión.
+
+**Incidente y cambio de diseño.** En ese primer release el tag se creó, pero semantic-release falló
+al empujar su nota de control (`refs/notes/semantic-release-v1.0.0`) y el pipeline cortó antes de
+publicar la imagen. Al reintentarlo, GitHub devolvió la causa: un error de almacenamiento del lado
+del servidor (`unable to write file …/pack-….pack` → `remote rejected … missing necessary objects`).
+El mismo push hecho desde una máquina local funcionó, así que el problema se limita a los pushes de
+objetos desde Actions. La solución fue separar responsabilidades: semantic-release corre en
+**dry run** (solo calcula la versión y las notas a partir de los Conventional Commits) y el tag y el
+Release se crean por la **API de GitHub** (`gh release create`), que no empuja objetos. La versión
+sigue siendo 100% automática y el corte (Andon Cord) dejó el artefacto sin publicar en lugar de
+publicar algo a medias.
 
 ### 2.4 Estructura del proyecto (alineada con el ejemplo de la cátedra)
 
