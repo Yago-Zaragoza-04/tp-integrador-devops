@@ -48,6 +48,18 @@ export class ReplaceTaskDto {
   done: boolean;
 }
 
+// Los query params llegan como texto: solo "true" y "false" se convierten; cualquier otro valor
+// queda como string y lo rechaza @IsBoolean (400 validation_error).
+const toBoolean = ({ value }: { value: unknown }) => (value === 'true' ? true : value === 'false' ? false : value);
+
+export class ListTasksQueryDto {
+  @ApiPropertyOptional({ description: 'Filtra por estado: true = completadas, false = pendientes', type: Boolean })
+  @Transform(toBoolean)
+  @IsOptional()
+  @IsBoolean({ message: 'done debe ser true o false' })
+  done?: boolean;
+}
+
 export class TaskDto {
   @ApiProperty({ format: 'uuid' })
   id: string;
@@ -88,7 +100,7 @@ export class ErrorDto {
   @ApiProperty({ example: 'validation_error' })
   error: string;
 
-  @ApiProperty({ example: 'El cuerpo de la petición no es válido.' })
+  @ApiProperty({ example: 'La petición no es válida.' })
   message: string;
 
   @ApiPropertyOptional({ type: [ErrorDetailDto] })

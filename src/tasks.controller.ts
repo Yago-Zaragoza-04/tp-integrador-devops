@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Query,
   Res,
 } from '@nestjs/common';
 import {
@@ -23,7 +24,7 @@ import {
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { CreateTaskDto, ErrorDto, ReplaceTaskDto, TaskDto, TaskListDto } from './task.dto';
+import { CreateTaskDto, ErrorDto, ListTasksQueryDto, ReplaceTaskDto, TaskDto, TaskListDto } from './task.dto';
 import { TasksService } from './tasks.service';
 
 const notFound = () => new NotFoundException({ error: 'not_found', message: 'La tarea no existe.' });
@@ -38,10 +39,11 @@ export class TasksController {
   constructor(private readonly tasks: TasksService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar tareas' })
+  @ApiOperation({ summary: 'Listar tareas', description: 'Con ?done=true o ?done=false filtra por estado.' })
   @ApiOkResponse({ type: TaskListDto })
-  list(): TaskListDto {
-    const items = this.tasks.list();
+  @ApiBadRequestResponse({ type: ErrorDto, description: 'done no es true ni false, o hay un parámetro desconocido' })
+  list(@Query() query: ListTasksQueryDto): TaskListDto {
+    const items = this.tasks.list({ done: query.done });
     return { items, total: items.length };
   }
 

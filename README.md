@@ -114,7 +114,7 @@ El `makefile` tiene los mismos atajos: `make up`, `make test`, `make load`, `mak
 
 | Método y ruta | Descripción |
 |---|---|
-| `GET /api/v1/tasks` | Lista de tareas |
+| `GET /api/v1/tasks` | Lista de tareas; `?done=true` o `?done=false` filtra por estado |
 | `POST /api/v1/tasks` | Crea una tarea (`title`, `description?`, `done?`) |
 | `GET /api/v1/tasks/{id}` | Obtiene una tarea |
 | `PUT /api/v1/tasks/{id}` | Reemplaza una tarea |

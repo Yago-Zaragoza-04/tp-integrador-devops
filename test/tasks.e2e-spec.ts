@@ -56,6 +56,35 @@ describe('API de tareas (e2e)', () => {
     expect(res.body.details).toEqual(expect.arrayContaining([expect.objectContaining({ field: 'title' })]));
   });
 
+  it('filtra el listado por estado con ?done=true|false', async () => {
+    await request(t.server).post('/api/v1/tasks').send({ title: 'pendiente' }).expect(201);
+    await request(t.server).post('/api/v1/tasks').send({ title: 'hecha', done: true }).expect(201);
+
+    const done = await request(t.server).get('/api/v1/tasks?done=true').expect(200);
+    expect(done.body.total).toBe(1);
+    expect(done.body.items[0]).toMatchObject({ title: 'hecha', done: true });
+
+    const pending = await request(t.server).get('/api/v1/tasks?done=false').expect(200);
+    expect(pending.body.total).toBe(1);
+    expect(pending.body.items[0]).toMatchObject({ title: 'pendiente', done: false });
+
+    await request(t.server)
+      .get('/api/v1/tasks')
+      .expect(200)
+      .expect((res) => expect(res.body.total).toBe(2));
+  });
+
+  it('rechaza un valor de done que no es booleano con 400', async () => {
+    const res = await request(t.server).get('/api/v1/tasks?done=quizas').expect(400);
+    expect(res.body.error).toBe('validation_error');
+    expect(res.body.details).toEqual([expect.objectContaining({ field: 'done' })]);
+  });
+
+  it('rechaza parámetros de consulta desconocidos en el listado', async () => {
+    const res = await request(t.server).get('/api/v1/tasks?admin=1').expect(400);
+    expect(res.body.details).toEqual([expect.objectContaining({ field: 'admin' })]);
+  });
+
   it('rechaza propiedades no declaradas (allow-list estricta)', async () => {
     const res = await request(t.server).post('/api/v1/tasks').send({ title: 'x', isAdmin: true }).expect(400);
     expect(res.body.details).toEqual([expect.objectContaining({ field: 'isAdmin' })]);
