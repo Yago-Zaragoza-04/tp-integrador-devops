@@ -22,6 +22,10 @@ updates:
       # TypeScript 7 queda fuera del rango que soporta ts-jest 29 (peer typescript >=4.3 <7).
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
+      # @types/node sigue la versión mayor del runtime (.nvmrc y Dockerfile): con tipos de una
+      # versión más nueva el compilador acepta APIs que Node 22 no tiene.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
