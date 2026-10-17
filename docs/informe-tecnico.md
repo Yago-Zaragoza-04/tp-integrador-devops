@@ -32,7 +32,7 @@ como infraestructura como código del hosting (unidad de Deployment).
 ### 1.1 Diagrama de flujo: del `git push` al deploy
 
 ```mermaid
-flowchart LR
+flowchart TB
     dev([Desarrollador]) -->|git push rama| pr[Pull Request a main]
 
     subgraph CI["ci.yml — en cada PR (checks requeridos)"]
@@ -64,6 +64,10 @@ flowchart LR
     smoke --> prod[(Render<br/>API en producción)]
     prod -->|/metrics| graf[Grafana Cloud<br/>dashboard + alertas]
 ```
+
+![Diagrama del pipeline exportado a PNG](img/pipeline-diagrama.png)
+
+*El mismo diagrama exportado con mermaid-cli, para los visores que no dibujan Mermaid.*
 
 ![Run de release.yml que publicó la v1.1.1](img/pipeline-run.png)
 
@@ -232,7 +236,7 @@ publicar algo a medias.
 **Versiones publicadas.** Cada release sale de un commit de `main` y se lee directo de la historia:
 
 ```text
-$ git log --oneline origin/main
+$ git log --oneline v1.1.1
 1826350 fix(metrics): show zero instead of no data when there are no errors (#19)   → v1.1.1
 377cb0d feat(tasks): filter the task list by status (#18)                          → v1.1.0
 0b891a1 chore(deps): ignore typescript major updates in dependabot (#16)          → v1.0.0 (*)
@@ -548,7 +552,7 @@ $ gh pr checks 10
 
 | Desperdicio (Poppendieck) | Cómo aparecía | Cómo lo evita esta solución |
 |---|---|---|
-| **Esperas y builds manuales** (*Delays*) | Compilar, taggear y subir la imagen a mano; esperar a que alguien despliegue | El merge dispara versión, imagen y deploy sin intervención; feedback de CI en ~1 minuto por PR |
+| **Esperas y builds manuales** (*Delays*) | Compilar, taggear y subir la imagen a mano; esperar a que alguien despliegue | El merge dispara versión, imagen y deploy sin intervención; feedback de CI en ~2 minutos por PR (entre 85 y 150 s en las últimas corridas de `ci.yml`) |
 | **Defectos detectados tarde** (*Defects*) | Un bug o un CVE se descubre en producción | Tests, cobertura, Trivy, audit y smoke en el PR: el defecto se corrige donde se produce (caso real del CVE de OpenSSL) |
 | **Configuración manual de servidores** (*Handoffs / Re-learning*) | Pasos de instalación en la cabeza de una persona | Dockerfile, compose, workflows y `render.yaml` versionados: el entorno se recrea con un comando |
 | **Trabajo a medio hacer** (*Partially done work*) | Ramas largas sin integrar | Ramas cortas, PRs chicos (un tema por PR) e integración diaria a `main` |
@@ -682,6 +686,6 @@ corre contra producción a 4 req/s: así no recibe respuestas 429.
   la versión que recibe, pero no cambia esa configuración. Por eso, los cambios de variables de
   entorno se guardan con *Save only* y se aplican redeployando la versión vigente por el hook, como
   en el Experimento 5. Así no se levanta una versión vieja por accidente.
-- Pendiente: deploy en Kubernetes (objetivo opcional de la materia), aprobación manual con
+- Próximos pasos (opcionales): deploy en Kubernetes (objetivo opcional de la materia), aprobación manual con
   *environment reviewers* si se pasa de Continuous Deployment a Continuous Delivery, y firma de
   imágenes (cosign).
