@@ -2,10 +2,11 @@
 
 **Materia:** DevOps · Universidad de Palermo · Docente: Lucas Bonanni
 **Repositorio:** https://github.com/Yago-Zaragoza-04/tp-integrador-devops
-**Integrantes:** Yago Zaragoza _(completar si el trabajo se hace en pareja)_
+**Integrante:** Yago Zaragoza (trabajo individual)
+**API en producción:** https://tp-integrador-devops-h9qo.onrender.com/docs · versión desplegada **1.1.1**
 
-> Las capturas se guardan en `docs/img/`. Donde dice **📸 pendiente** falta la
-> imagen; el texto describe solo lo que efectivamente se observó.
+> Las capturas están en `docs/img/`. Las salidas de comandos que se citan son reales; el texto
+> describe solo lo que efectivamente se observó.
 
 ---
 
@@ -19,7 +20,7 @@ Una API REST de tareas en **NestJS + TypeScript** atraviesa un ciclo de vida com
 | 2. Gestión de cambios | GitHub Flow, `main` protegida, PRs con evidencia, Conventional Commits validados por commitlint, **SemVer automático con semantic-release** |
 | 3. Docker | Dockerfile multi-stage (`base → deps → build → test → runtime`), `node:22.23.3-alpine3.24`, usuario `node`, caché de capas, `docker compose up` levanta API + Prometheus + Grafana |
 | 4. CI/CD | 8 workflows de GitHub Actions (6 reutilizables), Trivy, smoke tests, publicación en Docker Hub con tag SemVer, deploy a Render por Deploy Hook con la imagen exacta |
-| 5. Observabilidad | Logs JSON (`timestamp`, `level`, `path`, `status_code`…), métricas Prometheus, dashboard "Golden Signals" hecho desde cero, alertas de 5xx y latencia |
+| 5. Observabilidad | Logs JSON (`timestamp`, `level`, `path`, `status_code`…), métricas Prometheus, dashboard "Golden Signals" hecho desde cero, en local y en **Grafana Cloud** sobre producción, con alertas de 5xx y latencia que avisan por mail |
 
 Además: análisis OWASP Top 10 2025 aplicado a la API (unidad de Security) y blueprint de Render
 como infraestructura como código del hosting (unidad de Deployment).
@@ -64,7 +65,13 @@ flowchart LR
     prod -->|/metrics| graf[Grafana Cloud<br/>dashboard + alertas]
 ```
 
-📸 pendiente: `docs/img/pipeline-run.png` — grafo de un run de `release.yml` en la pestaña Actions.
+![Run de release.yml que publicó la v1.1.1](img/pipeline-run.png)
+
+*Run [38983619467](https://github.com/Yago-Zaragoza-04/tp-integrador-devops/actions/runs/38983619467)
+de `release.yml`, disparado por el merge del PR #19 (`fix(metrics): …`): lint y tests en paralelo →
+semantic-release calcula la **v1.1.1** → build, Trivy y smoke de la imagen → push a Docker Hub →
+Deploy Hook de Render y smoke contra producción. Duración total: 3 min 6 s. `rollback` queda en gris
+porque solo corre por `workflow_dispatch`.*
 
 ### 1.2 Componentes
 
@@ -136,7 +143,20 @@ Evidencia (`docker run --rm --entrypoint id tp-integrador-devops:local`):
 uid=1000(node) gid=1000(node) groups=1000(node),1000(node)
 ```
 
-📸 pendiente: `docs/img/docker-compose-ps.png` — `docker compose ps` con la API `(healthy)`.
+El entorno local completo con un solo comando (`docker compose up --build -d`):
+
+```text
+$ docker compose ps
+SERVICE      IMAGE                        STATUS                   PORTS
+api          tp-integrador-devops:local   Up 7 seconds (healthy)   0.0.0.0:3000->3000/tcp
+grafana      grafana/grafana:12.2.0       Up Less than a second    0.0.0.0:3001->3000/tcp
+prometheus   prom/prometheus:v3.6.0       Up 1 second              0.0.0.0:9090->9090/tcp
+
+$ docker compose exec api whoami
+node
+```
+
+El `(healthy)` sale del `HEALTHCHECK` de la imagen. Prometheus y Grafana también usan versiones fijas.
 
 ### 2.2 Estrategia de integración
 
@@ -168,7 +188,14 @@ remote: - 8 of 8 required status checks are expected.
  ! [remote rejected] main -> main (protected branch hook declined)
 ```
 
-📸 pendiente: `docs/img/branch-protection.png` — Settings → Branches → regla de `main`.
+![Regla de protección de main con los 8 checks requeridos](img/branch-protection.png)
+
+*Settings → Branches → regla de `main`: PR obligatorio, checks requeridos con la rama al día y
+conversaciones resueltas.*
+
+Cada PR documenta cómo se probó, con salidas reales. Ejemplo:
+[PR #19](https://github.com/Yago-Zaragoza-04/tp-integrador-devops/pull/19), que compara la
+consulta de 5xx antes y después del arreglo contra Prometheus y valida la alerta con `promtool`.
 
 ### 2.3 Versionado: SemVer con semantic-release
 
@@ -201,6 +228,38 @@ objetos desde Actions. La solución fue separar responsabilidades: semantic-rele
 Release se crean por la **API de GitHub** (`gh release create`), que no empuja objetos. La versión
 sigue siendo 100% automática y el corte (Andon Cord) dejó el artefacto sin publicar en lugar de
 publicar algo a medias.
+
+**Versiones publicadas.** Cada release sale de un commit de `main` y se lee directo de la historia:
+
+```text
+$ git log --oneline origin/main
+1826350 fix(metrics): show zero instead of no data when there are no errors (#19)   → v1.1.1
+377cb0d feat(tasks): filter the task list by status (#18)                          → v1.1.0
+0b891a1 chore(deps): ignore typescript major updates in dependabot (#16)          → v1.0.0 (*)
+5452298 ci(release): create tag and release through the github api (#15)
+b23e481 chore(deps): ignore nestjs major updates in dependabot (#13)
+78cc4a4 docs: add readme, step-by-step guide and technical report (#11)
+a1d4c66 ci: add modular github actions pipeline with semver release, docker hub and render deploy (#3)
+62d330e build(docker): add multi-stage image, compose stack and golden signals dashboard (#2)
+6b597dc feat(api): add tasks REST API in NestJS with Swagger docs, JSON logs and metrics (#1)
+d116dab chore: initialize repository
+
+$ gh release list
+v1.1.1  Latest  2026-10-16T23:53:01Z
+v1.1.0          2026-10-16T18:11:33Z
+v1.0.0          2026-10-16T17:34:22Z
+```
+
+(*) La v1.0.0 sale del `feat(api)` del PR #1. Por el incidente descripto arriba, recién se publicó
+cuando se relanzó el release (`workflow_dispatch`), después del arreglo del PR #15. Para entonces
+`main` ya estaba en el commit del PR #16, y ahí quedó el tag. Después, un `feat` subió la versión minor (1.0.0 → 1.1.0) y un `fix` la patch
+(1.1.0 → 1.1.1). Los `chore`, `ci` y `docs` no generaron release.
+
+![Tags de la imagen en Docker Hub](img/dockerhub-tags.png)
+
+*Docker Hub: `1.1.1` y `1.1` comparten el digest `88cc5c15637f`; `1.1.0` es `4caf76793b7e` y
+`1.0.0`/`1.0` es `ec4923…`. No existe el tag `latest`. Cada versión queda publicada, y eso es lo que
+permite el rollback sin reconstruir (§3.3).*
 
 ### 2.4 Estructura del proyecto (alineada con el ejemplo de la cátedra)
 
@@ -246,6 +305,11 @@ siempre como secretos (nunca en `docker-compose.yml` ni como build args de la im
 La documentación se genera desde el código con `@nestjs/swagger` (decoradores en controllers y DTOs),
 así que la spec no puede quedar desactualizada respecto de la API. Un test e2e verifica que todas las
 rutas estén documentadas y que `info.version` sea la versión desplegada.
+
+![Swagger UI en producción](img/docs-swagger.png)
+
+*https://tp-integrador-devops-h9qo.onrender.com/docs: la spec muestra la versión desplegada (1.1.1)
+y agrupa las rutas en Tareas, Operación y Chaos.*
 
 Configuración por variables de entorno validadas al arrancar (`src/config.ts`): `PORT`, `HOST`,
 `LOG_LEVEL`, `APP_VERSION`, `GIT_SHA`, `CHAOS_ENABLED`, `METRICS_TOKEN`, `RATE_LIMIT_MAX`,
@@ -324,7 +388,17 @@ El check requerido quedó en rojo y la protección de `main` impidió el merge; 
 publicó. La base vigente, `node:22.23.3-alpine3.24` (la misma versión que `.nvmrc`), da 0 hallazgos
 CRITICAL/HIGH. El PR se cerró sin mergear: un artefacto vulnerable nunca llegó a `main`.
 
-📸 pendiente: `docs/img/andon-trivy.png` — checks del PR #9 con `docker` en rojo.
+```text
+$ gh pr checks 9
+  fail  docker / Build, scan y smoke test        40s
+  pass  commitlint / Conventional Commits        22s
+  pass  lint / ESLint                            22s
+  pass  lint / Hadolint (Dockerfile)             8s
+  pass  lint / actionlint (workflows)            8s
+  pass  security / Gitleaks (secretos)           8s
+  pass  security / npm audit (dependencias)      7s
+  pass  test / Unit tests + cobertura            29s
+```
 
 **Visibilidad de fallos en producción:**
 
@@ -332,7 +406,10 @@ CRITICAL/HIGH. El PR se cerró sin mergear: un artefacto vulnerable nunca llegó
 |---|---|---|
 | Respuestas 5xx | métrica `http_requests_total{status_code=~"5.."}`; log `level:"error"` con `error_id` | Panel "Errores por segundo", alerta `HighErrorRate` (> 5% durante 2 min) |
 | Latencia alta | histograma `http_request_duration_seconds` → p95 | Panel "Latencia p50/p95/p99", alerta `HighLatencyP95` (> 1 s durante 5 min) |
-| API caída | `up{job="tp-api"} == 0` / health check de Render | alerta `ApiDown`, eventos de Render |
+| API caída | `up == 0` en el scrape / health check de Render | alerta `ApiDown` (stack local), eventos de Render |
+
+En producción, las alertas `HighErrorRate` y `HighLatencyP95` corren en Grafana Cloud y avisan por
+mail. Se probaron con una falla real en el Experimento 5 (§3.3).
 
 ### 3.3 Tercera Forma — experimentación y fallas controladas
 
@@ -350,7 +427,8 @@ CRITICAL/HIGH. El PR se cerró sin mergear: un artefacto vulnerable nunca llegó
 - **Aprendizaje:** el umbral de 5% detecta el problema sin falsos positivos con tráfico normal
   (los 4xx son errores del cliente y no disparan la alerta).
 
-📸 pendiente: `docs/img/dashboard-chaos.png` — dashboard durante el experimento.
+La versión en producción de este experimento, con captura del dashboard y de las alertas, es el
+Experimento 5.
 
 #### Experimento 2 — configuración inválida (fail fast)
 - **Acción:** `PORT=abc node dist/main.js`
@@ -385,11 +463,84 @@ Dependabot para actualizar la base.
 - **Aprendizaje:** los dos cortes son independientes (commitlint corre en paralelo) y `needs` evita
   gastar minutos de build en un cambio que ya está rojo. El PR se cerró sin mergear.
 
-📸 pendiente: `docs/img/andon-test-commitlint.png` — checks del PR #10.
+```text
+$ gh pr checks 10
+  fail  commitlint / Conventional Commits        13s
+  fail  test / Unit tests + cobertura            25s
+  skipping docker                                   0
+  pass  lint / ESLint                            17s
+  pass  lint / Hadolint (Dockerfile)             11s
+  pass  lint / actionlint (workflows)            12s
+  pass  security / Gitleaks (secretos)           9s
+  pass  security / npm audit (dependencias)      9s
+```
 
-#### Pendiente de documentar con capturas
-Rollback con `gh workflow run release.yml -f rollback_version=<anterior>` (requiere al menos dos
-versiones publicadas en Docker Hub).
+#### Experimento 5 — 5xx y latencia en producción (Grafana Cloud)
+- **Hipótesis:** si alrededor del 10% de las requests de producción devuelven 500 y otro 10%
+  tarda entre 0,2 y 2,5 s, el dashboard de Grafana Cloud lo muestra y las alertas `HighErrorRate`
+  (> 5% durante 2 min) y `HighLatencyP95` (p95 > 1 s durante 5 min) pasan a *Firing* y avisan por mail.
+- **Acción:**
+  1. Se puso `CHAOS_ENABLED=true` en Render y se redeployó la 1.1.1 por el hook.
+  2. `/api/v1/chaos/error` pasó de 404 a 500.
+  3. Se corrió el generador contra producción durante 8 minutos:
+  ```text
+  $ TARGET_URL=https://tp-integrador-devops-h9qo.onrender.com DURATION_S=480 RPS=4 CHAOS_RATIO=0.2 node scripts/load-test.mjs
+  [final] requests=1916 200:1042 201:337 204:75 400:118 404:160 500:184 net_errors=0 p50=223.2ms p95=1625.1ms
+  ```
+  Corrió de 21:56:28 a 22:04:29, hora de Argentina. Hubo 184 respuestas 500 sobre 1916 (9,6%).
+- **Resultado observado:**
+
+  | Hora (ART) | Evento |
+  |---|---|
+  | 21:58:10 | Las dos alertas pasan a *Pending* |
+  | 22:00:24 | `HighErrorRate` → **Firing**, llega el mail (critical) |
+  | 22:03:46 | `HighLatencyP95` → **Firing**, llega el mail (warning) |
+  | 22:08 y 22:10 | Termina el tráfico con chaos → mails de *Resolved* de latencia y de errores |
+
+  ![Dashboard de Grafana Cloud durante el experimento](img/dashboard-chaos.png)
+
+  *En el pico, la tasa de 5xx llegó a 10,01% y el p95 a 1,34 s, los dos en rojo. El p99 llegó a
+  unos 2,3 s. En el panel por ruta se ve `GET /api/v1/chaos/error`.*
+
+  ![Alertas en Firing](img/alertas-firing.png)
+  ![Mails de las alertas](img/alertas-mail.png)
+
+- **Recuperación:**
+  1. `CHAOS_ENABLED=false` y redeploy de la 1.1.1 por el hook
+     (run [38990704848](https://github.com/Yago-Zaragoza-04/tp-integrador-devops/actions/runs/38990704848)).
+  2. `/api/v1/chaos/error` vuelve a dar 404.
+  3. Las alertas se resolvieron solas.
+- **Aprendizaje:**
+  - El mail de `HighErrorRate` llegó unos 4 minutos después de empezar la falla: 2 minutos para que
+    la tasa a 5 minutos supere el umbral y 2 minutos de *pending*. El `for` evita alertar por un pico
+    aislado, pero ese es el costo en tiempo de detección.
+  - Hubo que corregir una consulta antes del experimento. Sin ningún 5xx, la serie no existe y el
+    panel mostraba *No data* en lugar de 0. La alerta quedaba en *No Data* en lugar de *Normal*. Se
+    arregló con `or vector(0)` en el PR #19.
+
+#### Experimento 6 — rollback a la versión anterior
+- **Hipótesis:** como cada versión queda publicada en Docker Hub, volver a la anterior es redeployar
+  su tag, sin reconstruir nada, y tarda menos de un minuto.
+- **Acción:** `gh workflow run release.yml -f rollback_version=1.1.0`. El job `rollback` llama al
+  Deploy Hook con la imagen `1.1.0` y corre el smoke test, que exige `/version == 1.1.0`.
+- **Resultado observado:**
+
+  | Paso | Run | Duración | `/version` después |
+  |---|---|---|---|
+  | Antes | — | — | `{"version":"1.1.1","commit":"1826350"}` |
+  | Rollback a 1.1.0 | [38986719280](https://github.com/Yago-Zaragoza-04/tp-integrador-devops/actions/runs/38986719280) | 44 s | `{"version":"1.1.0","commit":"377cb0d"}` |
+  | Vuelta a 1.1.1 | [38986793682](https://github.com/Yago-Zaragoza-04/tp-integrador-devops/actions/runs/38986793682) | 49 s | `{"version":"1.1.1","commit":"1826350"}` |
+
+  ![Eventos de Render: deploys por hook, incluido el rollback](img/render-events.png)
+
+  *Eventos de Render: a las 21:31 entra `4caf767` (1.1.0, el rollback) y a las 21:32 vuelve
+  `88cc5c1` (1.1.1). Todos los deploys dicen "Triggered via Deploy Hook". Los digests coinciden con
+  los de Docker Hub.*
+- **Recuperación (MTTR):** menos de un minuto por redeploy.
+- **Aprendizaje:**
+  - Publicar cada versión con su tag inmutable vuelve el rollback trivial.
+  - El rollback es manual, que alcanza para el alcance del TP. Uno automático, disparado por la
+    alerta, queda como mejora.
 
 ---
 
@@ -403,7 +554,8 @@ versiones publicadas en Docker Hub).
 | **Trabajo a medio hacer** (*Partially done work*) | Ramas largas sin integrar | Ramas cortas, PRs chicos (un tema por PR) e integración diaria a `main` |
 
 Además, el tamaño de lote chico se ve en la historia: cada PR dejó un único commit en `main` con
-un tipo claro (`chore`, `feat`, `build`, `ci`, `docs`).
+un tipo claro (`chore`, `feat`, `fix`, `build`, `ci`, `docs`). Del merge al deploy verificado en
+producción pasan unos 3 minutos (run de la v1.1.1, §1.1).
 
 ---
 
@@ -413,9 +565,15 @@ un tipo claro (`chore`, `feat`, `build`, `ci`, `docs`).
 
 Un objeto JSON por línea en stdout (pino). Cada request emite un evento `request completed`:
 
-```json
-{"level":"info","timestamp":"2026-10-02T22:54:28.371Z","service":"tp-integrador-devops","version":"0.0.0-local","request_id":"7b3de4b9-6ab0-4d7e-b665-334e776e66f0","method":"POST","path":"/api/v1/tasks","route":"/api/v1/tasks","status_code":201,"duration_ms":0.65,"msg":"request completed"}
+```text
+$ docker compose logs api --no-log-prefix | grep '"request completed"'
+{"level":"info","timestamp":"2026-10-17T01:54:37.992Z","service":"tp-integrador-devops","version":"0.0.0-local","request_id":"da025de7-6c23-4477-9e3c-f053147fb042","method":"POST","path":"/api/v1/tasks","route":"/api/v1/tasks","status_code":201,"duration_ms":21.62,"msg":"request completed"}
+{"level":"warn","timestamp":"2026-10-17T01:54:38.032Z","service":"tp-integrador-devops","version":"0.0.0-local","request_id":"e797dab8-9646-4780-8fd3-d0f6bb72dfc4","method":"GET","path":"/api/v1/tasks/00000000-0000-4000-8000-000000000000","route":"/api/v1/tasks/:id","status_code":404,"duration_ms":2,"msg":"request completed"}
+{"level":"warn","timestamp":"2026-10-17T01:54:38.075Z","service":"tp-integrador-devops","version":"0.0.0-local","request_id":"d03ab6d9-73b9-4978-9a9e-01d4107bcc27","method":"POST","path":"/api/v1/tasks","route":"/api/v1/tasks","status_code":400,"duration_ms":1.89,"msg":"request completed"}
 ```
+
+`path` es la URL pedida y `route`, el patrón que la atendió. El 404 queda en `warn` y conserva el
+id pedido en `path`.
 
 Nivel según el resultado (2xx/3xx `info`, 4xx `warn`, 5xx `error`; `/health`, `/ready` y
 `/metrics` en `debug`). Los logs internos de Nest también salen en JSON (`PinoLoggerService`). El
@@ -437,21 +595,55 @@ Consultas de las golden signals:
 ```promql
 sum(rate(http_requests_total{route!="/metrics"}[$__rate_interval]))                    # tráfico
 histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[$__rate_interval])))  # p95
-sum(rate(http_requests_total{status_code=~"5.."}[$__rate_interval]))                   # 5xx
+sum(rate(http_requests_total{status_code=~"5.."}[$__rate_interval])) or vector(0)      # 5xx
 ```
 
-📸 pendiente: `docs/img/dashboard-golden-signals.png` — dashboard con tráfico del generador.
+El `or vector(0)` de la consulta de errores hace que el panel muestre `0` y no *No data* cuando todavía
+no hubo ningún 5xx. Esa serie recién existe cuando ocurre el primero.
+
+Dashboard en Grafana Cloud con datos de producción. Las capturas son de corridas del generador sin
+chaos, a 4 req/s durante 5 minutos. La última corrida tuvo 1198 requests: 715 × 200, 255 × 201,
+65 × 204, 66 × 400, 97 × 404 y ningún 5xx. La captura del resumen es de la v1.1.1; las otras dos son
+de la v1.1.0, antes del arreglo del PR #19:
+
+![Resumen y tráfico](img/dashboard-golden-signals.png)
+
+*Resumen: el p95 queda en 4,75 ms y la tasa de 5xx en 0,00%. Los gráficos de tráfico muestran el pico
+del generador desglosado por código y por ruta.*
+
+![Latencia y errores](img/dashboard-latencia-errores.png)
+
+*Latencia p50/p95/p99 por ruta, y errores: solo 4xx, los 400 y 404 que el generador provoca a
+propósito.*
+
+![Tabla por ruta, runtime de Node y versión](img/dashboard-runtime-version.png)
+
+*Peticiones por ruta y código, CPU, heap y lag del event loop (la saturación, cuarta golden signal), y
+la versión que está corriendo, leída de `app_build_info`.*
+
+La latencia del dashboard (unos 5 ms) es la del servidor: el histograma mide cuánto tarda la API en
+responder. El generador, que corre en Argentina, midió p50 223 ms y p95 234 ms, porque suma el viaje
+de ida y vuelta hasta Render en Oregon. Las dos son correctas: miden cosas distintas.
 
 ### 5.3 Producción: Render + Grafana Cloud
 
-Render (plan free) no permite correr un colector de métricas (p. ej. Grafana Alloy) al lado de la app, así que Grafana Cloud
-**scrapea** la API: *Connections → Metrics Endpoint* → URL `https://<servicio>.onrender.com/metrics`,
-autenticación Bearer con el mismo valor de `METRICS_TOKEN` cargado en Render, intervalo 60 s.
-Después se importa el JSON del dashboard eligiendo el datasource `grafanacloud-*-prom` y se
-recrean las alertas `HighErrorRate` y `HighLatencyP95` como alert rules. Los logs JSON se ven en
-la pestaña Logs de Render.
+Render (plan free) no permite correr un colector de métricas, como Grafana Alloy, al lado de la app.
+Por eso Grafana Cloud **scrapea** la API desde afuera:
 
-📸 pendiente: configuración del scrape job y dashboard en Grafana Cloud.
+![Scrape job de Grafana Cloud](img/grafana-scrape-job.png)
+
+| Pieza | Configuración |
+|---|---|
+| Scrape job | *Connections → Metrics Endpoint*, URL `https://tp-integrador-devops-h9qo.onrender.com/metrics`, autenticación **Bearer** con el mismo valor de `METRICS_TOKEN` que tiene Render, intervalo de 1 minuto |
+| Verificación | En *Explore*, `up` da 1 en forma constante y aparecen las series de `http_requests_total` |
+| Dashboard | Se importa el mismo `observability/grafana/dashboards/golden-signals.json` que usa el stack local, eligiendo el datasource de Prometheus del stack (`grafanacloud-…-prom`) |
+| Alertas | Carpeta `TP DevOps`, grupo `tp-api-golden-signals` evaluado cada 1 min. Las reglas `HighErrorRate` (critical) y `HighLatencyP95` (warning) tienen las mismas expresiones de `observability/prometheus/alerts.yml`. Avisan por mail |
+| Logs | Los logs JSON se ven en la pestaña Logs de Render |
+
+`/metrics` sin token responde **401**, así que solo Grafana Cloud puede leer las métricas (A01).
+`ApiDown` no se recreó en Grafana Cloud, porque su expresión depende del nombre del job local
+(`tp-api`). En producción, la caída la detectan el health check de Render y el smoke test
+post-deploy.
 
 ---
 
@@ -467,8 +659,16 @@ docker compose --profile load up loadgen         # tráfico para el dashboard
 gh variable set DOCKERHUB_USERNAME               # usuario de Docker Hub
 gh secret set DOCKERHUB_TOKEN                    # Access Token (Read & Write), no la contraseña
 gh secret set RENDER_DEPLOY_HOOK_URL             # Render → Settings → Deploy Hook
-gh variable set RENDER_SERVICE_URL               # https://<servicio>.onrender.com
+gh variable set RENDER_SERVICE_URL               # https://tp-integrador-devops-h9qo.onrender.com
+
+# Producción
+node scripts/smoke-test.mjs https://tp-integrador-devops-h9qo.onrender.com
+TARGET_URL=https://tp-integrador-devops-h9qo.onrender.com DURATION_S=300 RPS=4 node scripts/load-test.mjs
+gh workflow run release.yml -f rollback_version=1.1.0   # rollback a una versión ya publicada
 ```
+
+El límite de la API es de 300 requests por minuto por IP (`RATE_LIMIT_MAX`). Por eso el generador
+corre contra producción a 4 req/s: así no recibe respuestas 429.
 
 ---
 
@@ -478,6 +678,10 @@ gh variable set RENDER_SERVICE_URL               # https://<servicio>.onrender.c
   foco de la consigna). `TasksService` aísla el almacenamiento: cambiarlo por una base no toca los controladores.
 - Render free duerme el servicio sin tráfico: el primer request tarda; el smoke post-deploy espera
   hasta 15 minutos.
+- Render sigue mostrando como imagen configurada del servicio la `1.0.0`. El Deploy Hook despliega
+  la versión que recibe, pero no cambia esa configuración. Por eso, los cambios de variables de
+  entorno se guardan con *Save only* y se aplican redeployando la versión vigente por el hook, como
+  en el Experimento 5. Así no se levanta una versión vieja por accidente.
 - Pendiente: deploy en Kubernetes (objetivo opcional de la materia), aprobación manual con
   *environment reviewers* si se pasa de Continuous Deployment a Continuous Delivery, y firma de
   imágenes (cosign).
