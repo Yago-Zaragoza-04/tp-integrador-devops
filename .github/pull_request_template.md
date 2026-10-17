@@ -28,6 +28,6 @@ $ docker compose up --build -d && node scripts/smoke-test.mjs http://localhost:3
 
 - [ ] Título del PR en formato Conventional Commits
 - [ ] Tests agregados o actualizados, en verde, cobertura ≥ 80%
-- [ ] Rutas nuevas documentadas en `src/docs/openapi.yaml`
+- [ ] Rutas nuevas documentadas con decoradores de `@nestjs/swagger` (controller + DTO)
 - [ ] Sin secretos en el diff ni en capturas
 - [ ] Informe técnico actualizado si cambia una decisión de diseño
