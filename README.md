@@ -9,6 +9,7 @@ Trabajo Práctico Integrador de DevOps (Universidad de Palermo). Una API REST de
 imagen Docker multi-stage, CI/CD en GitHub Actions, publicación en Docker Hub, deploy en Render y
 observabilidad con logs JSON, Prometheus y Grafana.
 
+- 🚀 **API en producción (Render):** https://tp-integrador-devops-h9qo.onrender.com/docs
 - 📄 **Informe técnico:** [`docs/informe-tecnico.md`](docs/informe-tecnico.md)
 - 🧭 **Guía paso a paso:** [`docs/step-by-step-guide.md`](docs/step-by-step-guide.md)
 
@@ -156,7 +157,7 @@ En *Settings → Secrets and variables → Actions* del repositorio:
 | `DOCKERHUB_USERNAME` | variable | usuario de Docker Hub |
 | `DOCKERHUB_TOKEN` | secreto | Access Token de Docker Hub (Read & Write) |
 | `RENDER_DEPLOY_HOOK_URL` | secreto | Render → servicio → Settings → Deploy Hook |
-| `RENDER_SERVICE_URL` | variable | `https://<servicio>.onrender.com` |
+| `RENDER_SERVICE_URL` | variable | `https://tp-integrador-devops-h9qo.onrender.com` |
 
 Mientras falten, el pipeline publica un warning y omite publish/deploy en lugar de fallar. El paso a
 paso completo (Docker Hub, Render, Grafana Cloud y protección de `main`) está en la
