@@ -4,7 +4,7 @@
 ARG NODE_IMAGE=node:22.23.3-alpine3.24
 
 #
-# 🧱 Base: configuración común a todas las etapas
+# Base: configuración común a todas las etapas
 #
 FROM ${NODE_IMAGE} AS base
 WORKDIR /app
@@ -13,7 +13,7 @@ ENV NODE_ENV=production \
     NPM_CONFIG_FUND=false
 
 #
-# 📦 Dependencias de producción. Se copian primero los manifiestos para que esta capa
+# Dependencias de producción. Se copian primero los manifiestos para que esta capa
 # quede en caché mientras package*.json no cambie.
 #
 FROM base AS deps
@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev --ignore-scripts
 
 #
-# 🏗️ Build: dependencias completas (incluye la CLI de Nest y TypeScript) y compilación a dist/
+# Build: dependencias completas (incluye la CLI de Nest y TypeScript) y compilación a dist/
 #
 FROM base AS build
 COPY package.json package-lock.json ./
@@ -33,7 +33,7 @@ COPY src ./src
 RUN npm run build
 
 #
-# 🧪 Test: lint y tests (unit + e2e) dentro de la misma base que producción
+# Test: lint y tests (unit + e2e) dentro de la misma base que producción
 #   docker compose --profile test run --rm test
 #
 FROM build AS test
@@ -45,7 +45,7 @@ USER node
 CMD ["sh", "-c", "npm run lint && npm run test:cov"]
 
 #
-# 🚀 Runtime: imagen final mínima, sin npm ni herramientas de build, usuario no root
+# Runtime: imagen final mínima, sin npm ni herramientas de build, usuario no root
 #
 FROM base AS runtime
 ARG APP_VERSION=0.0.0-dev
