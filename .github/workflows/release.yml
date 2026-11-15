@@ -54,7 +54,7 @@ jobs:
       # con un error de almacenamiento del lado de GitHub ("unable to write file ... pack").
       - name: Calcular versión y release notes
         id: semantic
-        uses: cycjimmy/semantic-release-action@v6
+        uses: cycjimmy/semantic-release-action@v8
         with:
           semantic_version: 25.0.9
           dry_run: true
